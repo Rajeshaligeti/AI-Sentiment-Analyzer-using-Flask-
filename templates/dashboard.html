@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Commerce Review Intelligence Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>📊 E-Commerce Review Intelligence</h1>
+                <p>Advanced sentiment analysis for product reviews</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Input Section -->
+            <section class="input-section">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="url-input">URL Scraping</button>
+                    <button class="tab-btn" data-tab="text-input">Text Input</button>
+                    <button class="tab-btn" data-tab="file-input">File Upload</button>
+                </div>
+
+                <!-- URL Input Tab -->
+                <div id="url-input" class="tab-content active">
+                    <div class="input-group">
+                        <label>Product URL (Amazon, Flipkart, etc.)</label>
+                        <div class="input-wrapper">
+                            <input type="url" id="productUrl" placeholder="https://www.amazon.com/..." />
+                            <button class="btn btn-primary" onclick="scrapeReviews()">Scrape Reviews</button>
+                        </div>
+                        <small>Supports Amazon, Flipkart, and generic e-commerce sites</small>
+                    </div>
+                </div>
+
+                <!-- Text Input Tab -->
+                <div id="text-input" class="tab-content">
+                    <div class="input-group">
+                        <label>Paste Review Text</label>
+                        <textarea id="reviewText" rows="4" placeholder="Paste your review text here..."></textarea>
+                        <button class="btn btn-primary" onclick="analyzeText()">Analyze</button>
+                    </div>
+                </div>
+
+                <!-- File Upload Tab -->
+                <div id="file-input" class="tab-content">
+                    <div class="input-group">
+                        <label>Upload File (CSV, TXT, Excel)</label>
+                        <div class="file-input">
+                            <input type="file" id="reviewFile" accept=".csv,.txt,.xlsx,.xls" />
+                            <button class="btn btn-primary" onclick="uploadFile()">Upload & Analyze</button>
+                        </div>
+                        <small>First column should contain review text</small>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Processing reviews...</p>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section">
+                <!-- Summary Stats -->
+                <div id="summaryStats" class="summary-stats hidden">
+                    <div class="stat-card">
+                        <span class="stat-label">Total Reviews</span>
+                        <span id="totalReviews" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-card sentiment-positive">
+                        <span class="stat-label">Positive</span>
+                        <span id="positiveCount" class="stat-value">0%</span>
+                    </div>
+                    <div class="stat-card sentiment-negative">
+                        <span class="stat-label">Negative</span>
+                        <span id="negativeCount" class="stat-value">0%</span>
+                    </div>
+                    <div class="stat-card sentiment-neutral">
+                        <span class="stat-label">Neutral</span>
+                        <span id="neutralCount" class="stat-value">0%</span>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div id="chartsSection" class="charts-section hidden">
+                    <div class="chart-container">
+                        <h3>Sentiment Distribution</h3>
+                        <canvas id="sentimentChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Emotion Analysis</h3>
+                        <canvas id="emotionChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Aspect Sentiment</h3>
+                        <canvas id="aspectChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Word Cloud Section -->
+                <div id="wordcloudSection" class="wordcloud-section hidden">
+                    <h3>Word Cloud</h3>
+                    <div class="wordcloud-container">
+                        <img id="wordcloudImage" src="" alt="Word Cloud" />
+                    </div>
+                    <a href="{{ url_for('download_wordcloud') }}" class="btn btn-secondary">Download</a>
+                </div>
+
+                <!-- Insights Section -->
+                <div id="insightsSection" class="insights-section hidden">
+                    <h3>GenAI Business Insights</h3>
+                    <button class="btn btn-primary" onclick="generateInsights()">Generate Insights</button>
+                    <div id="insightsContent" class="insights-content"></div>
+                </div>
+
+                <!-- Reviews Table -->
+                <div id="reviewsTable" class="reviews-table hidden">
+                    <h3>Individual Reviews</h3>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Review</th>
+                                    <th>Sentiment</th>
+                                    <th>Confidence</th>
+                                    <th>Emotion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reviewsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Chart instances storage -->
+    <script>
+        let sentimentChart, emotionChart, aspectChart;
+        let currentAnalysisData = null;
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                e.target.classList.add('active');
+                document.getElementById(e.target.dataset.tab).classList.add('active');
+            });
+        });
+
+        function showLoading(show) {
+            const loader = document.getElementById('loadingIndicator');
+            if (show) {
+                loader.classList.remove('hidden');
+            } else {
+                loader.classList.add('hidden');
+            }
+        }
+
+        function hideAllResults() {
+            document.getElementById('summaryStats').classList.add('hidden');
+            document.getElementById('chartsSection').classList.add('hidden');
+            document.getElementById('wordcloudSection').classList.add('hidden');
+            document.getElementById('insightsSection').classList.add('hidden');
+            document.getElementById('reviewsTable').classList.add('hidden');
+        }
+
+        function ensureServerOrigin() {
+            if (window.location.protocol === 'file:') {
+                alert('Please open the dashboard via http://localhost:5000 (not as a local file).');
+                return false;
+            }
+            return true;
+        }
+
+        async function safeFetch(url, options) {
+            const response = await fetch(url, options);
+            const contentType = response.headers.get('content-type') || '';
+            let data = null;
+
+            if (contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                data = { error: text || 'Unexpected response from server' };
+            }
+
+            return { response, data };
+        }
+
+        async function scrapeReviews() {
+            if (!ensureServerOrigin()) return;
+
+            const url = document.getElementById('productUrl').value.trim();
+            if (!url) {
+                alert('Please enter a product URL');
+                return;
+            }
+
+            showLoading(true);
+            hideAllResults();
+
+            try {
+                const { response, data } = await safeFetch('/api/scrape-reviews', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                if (response.ok) {
+                    currentAnalysisData = data;
+                    displayResults(data);
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to scrape reviews'));
+                }
+            } catch (error) {
+                alert('Error: Failed to fetch. Please ensure the server is running at http://localhost:5000');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function analyzeText() {
+            if (!ensureServerOrigin()) return;
+
+            const text = document.getElementById('reviewText').value.trim();
+            if (!text) {
+                alert('Please enter review text');
+                return;
+            }
+
+            showLoading(true);
+            hideAllResults();
+
+            try {
+                const { response, data } = await safeFetch('/api/batch-analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reviews: [text] })
+                });
+
+                if (response.ok) {
+                    currentAnalysisData = data;
+                    displayResults(data);
+                } else {
+                    alert('Error: ' + (data.error || 'Analysis failed'));
+                }
+            } catch (error) {
+                alert('Error: Failed to fetch. Please ensure the server is running at http://localhost:5000');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function uploadFile() {
+            if (!ensureServerOrigin()) return;
+
+            const fileInput = document.getElementById('reviewFile');
+            if (!fileInput.files.length) {
+                alert('Please select a file');
+                return;
+            }
+
+            showLoading(true);
+            hideAllResults();
+
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+
+                const { response, data } = await safeFetch('/api/upload-file', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    currentAnalysisData = data;
+                    displayResults(data);
+                } else {
+                    alert('Error: ' + (data.error || 'Upload failed'));
+                }
+            } catch (error) {
+                alert('Error: Failed to fetch. Please ensure the server is running at http://localhost:5000');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayResults(data) {
+            // Show summary stats
+            const stats = document.getElementById('summaryStats');
+            const total = data.total_processed || data.total_analyzed || 0;
+            const sentimentDist = data.statistics.sentiment_distribution;
+            const total_sentiment = Object.values(sentimentDist).reduce((a, b) => a + b, 0);
+
+            document.getElementById('totalReviews').textContent = total;
+            document.getElementById('positiveCount').textContent = Math.round((sentimentDist.positive / total_sentiment) * 100) + '%';
+            document.getElementById('negativeCount').textContent = Math.round((sentimentDist.negative / total_sentiment) * 100) + '%';
+            document.getElementById('neutralCount').textContent = Math.round((sentimentDist.neutral / total_sentiment) * 100) + '%';
+            stats.classList.remove('hidden');
+
+            // Show charts
+            document.getElementById('chartsSection').classList.remove('hidden');
+            updateCharts(data);
+
+            // Show wordcloud
+            if (data.wordcloud) {
+                document.getElementById('wordcloudImage').src = '/static/wordcloud.png?t=' + Date.now();
+                document.getElementById('wordcloudSection').classList.remove('hidden');
+            }
+
+            // Show reviews table
+            if (data.results) {
+                populateReviewsTable(data.results);
+                document.getElementById('reviewsTable').classList.remove('hidden');
+            }
+
+            // Show insights section
+            document.getElementById('insightsSection').classList.remove('hidden');
+        }
+
+        function updateCharts(data) {
+            const sentimentDist = data.statistics.sentiment_distribution;
+            const emotions = data.statistics.emotions;
+            const aspects = data.statistics.aspects;
+
+            // Sentiment Chart
+            const ctx1 = document.getElementById('sentimentChart').getContext('2d');
+            if (sentimentChart) sentimentChart.destroy();
+            sentimentChart = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Positive', 'Negative', 'Neutral'],
+                    datasets: [{
+                        data: [sentimentDist.positive, sentimentDist.negative, sentimentDist.neutral],
+                        backgroundColor: ['#4CAF50', '#F44336', '#9E9E9E'],
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Emotion Chart
+            const ctx2 = document.getElementById('emotionChart').getContext('2d');
+            if (emotionChart) emotionChart.destroy();
+            const emotionLabels = Object.keys(emotions).slice(0, 6);
+            const emotionValues = emotionLabels.map(e => emotions[e]);
+            emotionChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: emotionLabels.map(e => e.charAt(0).toUpperCase() + e.slice(1)),
+                    datasets: [{
+                        label: 'Emotion Intensity',
+                        data: emotionValues,
+                        backgroundColor: '#2196F3',
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true } }
+                }
+            });
+
+            // Aspect Chart
+            const ctx3 = document.getElementById('aspectChart').getContext('2d');
+            if (aspectChart) aspectChart.destroy();
+            const aspectLabels = Object.keys(aspects);
+            const aspectPositive = aspectLabels.map(a => aspects[a].positive);
+            const aspectNegative = aspectLabels.map(a => aspects[a].negative);
+            aspectChart = new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: aspectLabels.map(a => a.charAt(0).toUpperCase() + a.slice(1)),
+                    datasets: [
+                        {
+                            label: 'Positive',
+                            data: aspectPositive,
+                            backgroundColor: '#4CAF50'
+                        },
+                        {
+                            label: 'Negative',
+                            data: aspectNegative,
+                            backgroundColor: '#F44336'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: { x: { stacked: false } }
+                }
+            });
+        }
+
+        function populateReviewsTable(reviews) {
+            const tbody = document.getElementById('reviewsTableBody');
+            tbody.innerHTML = '';
+
+            reviews.forEach(review => {
+                const row = document.createElement('tr');
+                const sentimentClass = 'sentiment-' + review.sentiment.toLowerCase();
+                const emotion = review.dominant_emotion || 'N/A';
+
+                row.innerHTML = `
+                    <td>${review.id}</td>
+                    <td title="${review.full_text}">${review.text}</td>
+                    <td><span class="sentiment-badge ${sentimentClass}">${review.sentiment}</span></td>
+                    <td>${Math.round(review.confidence * 100)}%</td>
+                    <td>${emotion}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function generateInsights() {
+            if (!currentAnalysisData || !currentAnalysisData.results) {
+                alert('Please analyze reviews first');
+                return;
+            }
+
+            const reviews = currentAnalysisData.results.map(r => r.full_text);
+            const ratings = [];
+
+            showLoading(true);
+
+            try {
+                const response = await fetch('/api/generate-insights', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reviews: reviews, ratings: ratings })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayInsights(data);
+                } else {
+                    alert('Error: ' + (data.error || 'Insights generation failed'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayInsights(data) {
+            const content = document.getElementById('insightsContent');
+            let html = '<div class="insights-grid">';
+
+            if (data.summary) {
+                html += `<div class="insight-card">
+                    <h4>Summary</h4>
+                    <p>${data.summary}</p>
+                </div>`;
+            }
+
+            if (data.recommendations) {
+                html += `<div class="insight-card">
+                    <h4>Improvement Suggestions</h4>
+                    <p>${data.recommendations}</p>
+                </div>`;
+            }
+
+            if (data.marketing_angle) {
+                html += `<div class="insight-card">
+                    <h4>Marketing Angles</h4>
+                    <p>${data.marketing_angle}</p>
+                </div>`;
+            }
+
+            if (data.business_insights) {
+                if (data.business_insights.strengths) {
+                    html += `<div class="insight-card">
+                        <h4>Key Strengths</h4>
+                        <ul>${data.business_insights.strengths.map(s => `<li>${s}</li>`).join('')}</ul>
+                    </div>`;
+                }
+
+                if (data.business_insights.weaknesses) {
+                    html += `<div class="insight-card">
+                        <h4>Areas to Improve</h4>
+                        <ul>${data.business_insights.weaknesses.map(w => `<li>${w}</li>`).join('')}</ul>
+                    </div>`;
+                }
+            }
+
+            html += '</div>';
+            content.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

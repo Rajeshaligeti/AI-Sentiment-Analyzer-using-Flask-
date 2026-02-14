@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Sentiment Analyzer</title>
+    <!-- Link to the external CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>AI Sentiment Analyzer</h1>
+        <p>Analyze the sentiment of your text or upload a batch file.</p>
+        
+        <!-- Text input form -->
+        <form method="POST" action="/" enctype="multipart/form-data">
+            <textarea name="user_input" rows="5" placeholder="Enter text here..."></textarea>
+            <button type="submit">Analyze</button>
+        </form>
+        
+        <hr>
+        
+        <!-- File upload form -->
+        <form method="POST" action="/batch" enctype="multipart/form-data" id="batchForm">
+            <label for="batch_file">Upload File for Batch Analysis:</label>
+            <input type="file" name="batch_file" id="batch_file" accept=".csv,.txt,.xlsx,.xls" required>
+            <small>Supported formats: CSV, TXT, Excel (.xlsx, .xls)</small>
+            <button type="submit">Upload and Analyze</button>
+        </form>
+        
+        <!-- Batch Results Display -->
+        <div id="batchResults" style="display: none;">
+            <h3>Batch Analysis Results:</h3>
+            <div id="resultsContainer"></div>
+        </div>
+        
+        <!-- Display Sentiment Result -->
+        {% if sentiment %}
+        <div class="result">
+            <h3>Sentiment Analysis Result:</h3>
+            <p><strong>Sentiment:</strong> {{ sentiment }}</p>
+            <p><strong>Confidence:</strong> {{ confidence }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Display Word Cloud -->
+        {% if wordcloud %}
+        <div class="wordcloud">
+            <h3>Word Cloud:</h3>
+            <img src="{{ url_for('static', filename='wordcloud.png') }}" alt="Word Cloud">
+            <br>
+            <a href="{{ url_for('download_wordcloud') }}" class="download-btn" download>
+                <button type="button">Download Word Cloud</button>
+            </a>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+        // Handle batch form submission
+        document.getElementById('batchForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const resultsContainer = document.getElementById('resultsContainer');
+            const batchResults = document.getElementById('batchResults');
+            
+            // Show loading message
+            resultsContainer.innerHTML = '<p>Processing file... Please wait.</p>';
+            batchResults.style.display = 'block';
+            
+            try {
+                const response = await fetch('/batch', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultsContainer.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                } else if (data.success) {
+                    let html = `<p><strong>Total processed:</strong> ${data.total_processed} entries</p>`;
+                    html += '<div class="results-table">';
+                    html += '<table border="1" style="width: 100%; border-collapse: collapse;">';
+                    html += '<tr><th>ID</th><th>Text</th><th>Sentiment</th><th>Confidence</th></tr>';
+                    
+                    data.results.forEach(result => {
+                        html += `<tr>
+                            <td>${result.id}</td>
+                            <td>${result.text}</td>
+                            <td style="color: ${getSentimentColor(result.sentiment)}">${result.sentiment}</td>
+                            <td>${(result.confidence * 100).toFixed(1)}%</td>
+                        </tr>`;
+                    });
+                    
+                    html += '</table></div>';
+                    resultsContainer.innerHTML = html;
+                }
+            } catch (error) {
+                resultsContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        });
+        
+        function getSentimentColor(sentiment) {
+            switch(sentiment.toLowerCase()) {
+                case 'positive': return 'green';
+                case 'negative': return 'red';
+                case 'neutral': return 'gray';
+                case 'mixed': return 'orange';
+                default: return 'black';
+            }
+        }
+    </script>
+</body>
+</html>
