@@ -20,9 +20,13 @@ import logging
 from modules.scraper import ReviewScraper
 from modules.sentiment_analyzer import EnhancedSentimentAnalyzer, AspectSentimentAnalyzer
 from modules.llm_engine import ReviewAnalysisEngine, InsightAggregator
+from config import get_config
 
 # Load environment variables
 load_dotenv()
+
+# Load app configuration
+config = get_config()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -52,7 +56,10 @@ def load_models():
     # Gemini API is initialized in ReviewAnalysisEngine
     return {
         'sentiment_analyzer': EnhancedSentimentAnalyzer(),
-        'review_engine': ReviewAnalysisEngine(prefer_local=True),
+        'review_engine': ReviewAnalysisEngine(
+            prefer_local=config.PREFER_LOCAL_LLM,
+            api_key=config.GOOGLE_API_KEY
+        ),
         'scraper': ReviewScraper()
     }
 

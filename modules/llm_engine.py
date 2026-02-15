@@ -107,14 +107,14 @@ class GeminiLLM:
 class ReviewAnalysisEngine:
     """LLM-powered review analysis engine"""
     
-    def __init__(self, prefer_local: bool = True):
+    def __init__(self, prefer_local: bool = True, api_key: Optional[str] = None):
         """
         Initialize with preference for local or cloud LLM
         prefer_local=True: Try Ollama first, fall back to Gemini
         prefer_local=False: Try Gemini first, fall back to Ollama
         """
         self.ollama = OllamaLLM()
-        self.gemini = GeminiLLM()
+        self.gemini = GeminiLLM(api_key=api_key)
         self.prefer_local = prefer_local
     
     def get_llm(self) -> Optional[object]:
