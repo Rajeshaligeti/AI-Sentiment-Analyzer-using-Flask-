@@ -16,6 +16,12 @@ AI Sentiment Analyzer is a web-based application built using **Flask** that anal
 ### Sentiment Result
 ![Output](media/Sentiment_analysis.png)
 
+### Scraper Reviews
+![Scraper Reviews](media/Scraper_reviews.png)
+
+### AI Insights
+![AI Insights](media/AI%20Insights.png)
+
 ## Features
 - **Text Sentiment Analysis**: Analyze the sentiment of single text input with confidence scores
 - **Batch Sentiment Analysis**: Upload CSV, TXT, or Excel files for batch processing (up to 100 entries)
