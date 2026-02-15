@@ -128,6 +128,8 @@ AI Sentiment Analyzer is a web-based application built using **Flask** that anal
 - **Jinja2**: Templating engine for dynamic HTML rendering
 - **HTML5 & CSS3**: Front-end design and styling
 - **JavaScript**: Interactive frontend functionality
+
+## License
 This project is licensed under the [Apache License 2.0](LICENSE).  
 Feel free to use, modify, and distribute the code as per the terms of the license.
 
